@@ -77,8 +77,11 @@ void QuartzInputMouse::LockCursorToGameWindow()
     // Clear any accumulated movement
     thread_dx.store(0, std::memory_order_relaxed);
     thread_dy.store(0, std::memory_order_relaxed);
-    id monitor = [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskMouseMoved
-                                                       handler:m_event_callback];
+    // macOS sends dragged events instead of moved events while a mouse button is held.
+    const NSEventMask movement_mask = NSEventMaskMouseMoved | NSEventMaskLeftMouseDragged |
+                                      NSEventMaskRightMouseDragged | NSEventMaskOtherMouseDragged;
+    id monitor = [NSEvent addLocalMonitorForEventsMatchingMask:movement_mask
+                                                     handler:m_event_callback];
     m_monitor.store((__bridge void*)monitor, std::memory_order_relaxed);
   }
   else
