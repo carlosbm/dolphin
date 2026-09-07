@@ -20,7 +20,9 @@ jobs:
       CCACHE_COMPRESS: true
       CCACHE_COMPRESSLEVEL: 9
       CCACHE_MAXSIZE: 200M
-      MACOSX_DEPLOYMENT_TARGET: "11.0"
+      MACOSX_DEPLOYMENT_TARGET: "26.0"
+      QT_DEPLOYMENT_TARGET: "14.0"
+      DEPS_LOG_DIR: ${{ runner.temp }}/primehack-dependency-logs
       DEVELOPER_DIR: /Applications/Xcode_26.4.1.app/Contents/Developer
 
     steps:
@@ -46,7 +48,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/deps
-          key: macos-11-xcode-26.4.1-universal-deps-${{ hashFiles('.github/workflows/scripts/macos/build-dependencies.sh') }}
+          key: macos-26-xcode-26.4.1-qt14-universal-deps-${{ hashFiles('.github/workflows/scripts/macos/build-dependencies.sh') }}
 
       - name: Build Dependencies
         if: steps.cache-deps.outputs.cache-hit != 'true'
@@ -57,7 +59,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/moltenvk
-          key: macos-11-universal-moltenvk-v2-${{ hashFiles('.github/workflows/macos_build.yml', 'Externals/MoltenVK/CMakeLists.txt', 'Externals/MoltenVK/patches/*.patch') }}
+          key: macos-26-xcode-26.4.1-universal-moltenvk-v3-${{ hashFiles('.github/workflows/macos_build.yml', 'Externals/MoltenVK/CMakeLists.txt', 'Externals/MoltenVK/patches/*.patch') }}
 
       - name: Build MoltenVK
         if: steps.cache-moltenvk.outputs.cache-hit != 'true'
@@ -83,8 +85,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .ccache
-          key: macos-11-xcode-26.4.1-universal-ccache-${{ github.run_id }}
-          restore-keys: macos-11-xcode-26.4.1-universal-ccache-
+          key: macos-26-xcode-26.4.1-universal-ccache-${{ github.run_id }}
+          restore-keys: macos-26-xcode-26.4.1-universal-ccache-
 
       - name: Configure x86_64
         run: bash .github/workflows/scripts/macos/configure.sh x86_64 build
@@ -126,6 +128,7 @@ jobs:
             build/build.log
             build-arm/build.log
             build/Testing/Temporary/LastTest.log
+            ${{ runner.temp }}/primehack-dependency-logs
           if-no-files-found: ignore
           retention-days: 14
 

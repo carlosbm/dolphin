@@ -136,7 +136,7 @@ fi
 bash "$SOURCE_DIR/Tools/mac-codesign.sh" -e "$ENTITLEMENTS" - "$STAGING_APP"
 
 MIN_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$STAGING_APP/Contents/Info.plist")"
-if [[ "$MIN_VERSION" != 11.* ]]; then
+if [[ "$MIN_VERSION" != 26.* ]]; then
   echo "Unexpected minimum macOS version in bundle: $MIN_VERSION" >&2
   exit 1
 fi
