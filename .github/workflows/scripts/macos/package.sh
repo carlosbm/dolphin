@@ -91,6 +91,10 @@ check_arm_files_have_x86_counterparts() {
 
 check_universal_macho_files() {
   local path archs
+  local file_list="$STAGING_DIR/validation-files"
+
+  # Finish traversing before validation can fail and trigger staging cleanup.
+  find "$STAGING_APP" -type f -print0 > "$file_list"
 
   while IFS= read -r -d '' path; do
     if ! is_macho "$path"; then
@@ -103,11 +107,13 @@ check_universal_macho_files() {
       exit 1
     fi
 
-    if otool -L "$path" | grep -E '/Users/|/opt/homebrew|/usr/local'; then
+    # otool prints an unindented filename header for each architecture. Only
+    # inspect indented library entries, not the staging path in those headers.
+    if otool -L "$path" | grep -E '^[[:space:]]+(/Users/|/opt/homebrew/|/usr/local/)'; then
       echo "Mach-O file still references a build-machine library: $path" >&2
       exit 1
     fi
-  done < <(find "$STAGING_APP" -type f -print0)
+  done < "$file_list"
 }
 
 if TAG="$(git -C "$SOURCE_DIR" describe --tags --exact-match HEAD 2>/dev/null)"; then
