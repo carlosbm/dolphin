@@ -1,0 +1,47 @@
+#!/bin/bash
+
+set -euo pipefail
+
+if [[ $# -ne 2 ]]; then
+  echo "Usage: $0 <x86_64|arm64> <build directory>" >&2
+  exit 2
+fi
+
+ARCH="$1"
+BUILD_DIR="$2"
+
+case "$ARCH" in
+  x86_64|arm64) ;;
+  *)
+    echo "Unsupported macOS architecture: $ARCH" >&2
+    exit 2
+    ;;
+esac
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SOURCE_DIR="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
+MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-11.0}"
+DEPS_PREFIX="${DEPS_PREFIX:-$HOME/deps;$HOME/moltenvk}"
+
+cmake \
+  -S "$SOURCE_DIR" \
+  -B "$BUILD_DIR" \
+  -G Ninja \
+  -DCMAKE_OSX_ARCHITECTURES="$ARCH" \
+  -DCMAKE_SYSTEM_PROCESSOR="$ARCH" \
+  -DCMAKE_SYSTEM_NAME=Darwin \
+  -DCMAKE_OSX_DEPLOYMENT_TARGET="$MACOSX_DEPLOYMENT_TARGET" \
+  -DCMAKE_PREFIX_PATH="$DEPS_PREFIX" \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DUSE_BUNDLED_MOLTENVK=OFF \
+  -DPOSTPROCESS_BUNDLE=ON \
+  -DMACOS_CODE_SIGNING=OFF \
+  -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON \
+  -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+  -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+  -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON \
+  -DUSE_SYSTEM_LIBS=OFF \
+  -DUSE_SYSTEM_BZIP2=ON \
+  -DUSE_SYSTEM_CURL=ON \
+  -DUSE_SYSTEM_ICONV=ON \
+  -DUSE_SYSTEM_SDL3=OFF

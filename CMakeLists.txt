@@ -23,6 +23,12 @@ set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
 project(dolphin-emu)
 
+if(APPLE AND CMAKE_OSX_DEPLOYMENT_TARGET VERSION_LESS "11.0")
+  message(FATAL_ERROR
+    "This macOS build requires CMAKE_OSX_DEPLOYMENT_TARGET 11.0 or newer."
+  )
+endif()
+
 if (CMAKE_VERSION VERSION_LESS "3.25" AND CMAKE_SYSTEM_NAME MATCHES "Linux")
   set(LINUX TRUE)
 endif()
