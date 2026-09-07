@@ -117,6 +117,18 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Upload build diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-build-diagnostics-${{ github.sha }}
+          path: |
+            build/build.log
+            build-arm/build.log
+            build/Testing/Temporary/LastTest.log
+          if-no-files-found: ignore
+          retention-days: 14
+
   release:
     name: Publish macOS release
     if: startsWith(github.ref, 'refs/tags/')

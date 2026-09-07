@@ -583,7 +583,7 @@ IPRedirections GetIPRedirections()
 
       if (original.has_value() && replacement.has_value())
       {
-        result.emplace_back(*original, *replacement);
+        result.push_back(IPRedirection{.original = *original, .replacement = *replacement});
         continue;
       }
 

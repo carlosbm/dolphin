@@ -13,5 +13,8 @@ JOBS="${CMAKE_BUILD_PARALLEL_LEVEL:-$(sysctl -n hw.ncpu)}"
 ccache -p
 ccache -s
 ccache -z
-cmake --build "$BUILD_DIR" --target build_final_bundle --parallel "$JOBS"
+# Keep compiling independent targets after an error so one run exposes all
+# compilation failures. pipefail preserves Ninja's failure status through tee.
+cmake --build "$BUILD_DIR" --target build_final_bundle --parallel "$JOBS" -- -k 0 \
+  2>&1 | tee "$BUILD_DIR/build.log"
 ccache -s
