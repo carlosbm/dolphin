@@ -7,6 +7,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <utility>
 #include <vector>
 
 #include "Common/Logging/Log.h"
@@ -88,6 +89,8 @@ public:
 private:
   struct Listener
   {
+    explicit Listener(CallbackType callback_) : callback(std::move(callback_)) {}
+
     const CallbackType callback;
     bool is_pending_removal{};
   };

@@ -11,7 +11,7 @@ endif()
 
 # Minimum OS X version.
 # This is inserted into the Info.plist as well.
-set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0.0" CACHE STRING "")
+set(CMAKE_OSX_DEPLOYMENT_TARGET "26.0" CACHE STRING "")
 
 set(CMAKE_USER_MAKE_RULES_OVERRIDE "${CMAKE_CURRENT_SOURCE_DIR}/CMake/FlagsOverride.cmake")
 
@@ -22,6 +22,12 @@ set(CMAKE_USER_MAKE_RULES_OVERRIDE "${CMAKE_CURRENT_SOURCE_DIR}/CMake/FlagsOverr
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
 project(dolphin-emu)
+
+if(APPLE AND CMAKE_OSX_DEPLOYMENT_TARGET VERSION_LESS "26.0")
+  message(FATAL_ERROR
+    "This macOS build requires CMAKE_OSX_DEPLOYMENT_TARGET 26.0 or newer."
+  )
+endif()
 
 if (CMAKE_VERSION VERSION_LESS "3.25" AND CMAKE_SYSTEM_NAME MATCHES "Linux")
   set(LINUX TRUE)

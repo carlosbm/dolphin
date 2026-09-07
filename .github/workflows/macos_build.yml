@@ -1,17 +1,28 @@
 name: MacOS Build Steps
 
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build_macos:
     name: macOS Build
-    runs-on: macos-14
+    runs-on: macos-26
+    permissions:
+      contents: read
     env:
       CCACHE_BASEDIR: ${{ github.workspace }}
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_COMPRESS: true
       CCACHE_COMPRESSLEVEL: 9
       CCACHE_MAXSIZE: 200M
+      MACOSX_DEPLOYMENT_TARGET: "26.0"
+      QT_DEPLOYMENT_TARGET: "14.0"
+      DEVELOPER_DIR: /Applications/Xcode_26.4.1.app/Contents/Developer
 
     steps:
       - name: Checkout Repository
@@ -19,33 +30,37 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Verify Xcode
+        run: |
+          test -d "$DEVELOPER_DIR"
+          xcodebuild -version
+          xcrun --sdk macosx --show-sdk-path
+
       - name: Install Packages
         env:
           HOMEBREW_NO_INSTALL_CLEANUP: 1
           HOMEBREW_NO_ANALYTICS: 1
-        run: |
-          if ! brew install ccache ninja; then
-            brew update
-            brew install ccache ninja
-          fi
+        run: brew install ccache ninja
 
       - name: Cache Dependencies
         id: cache-deps
         uses: actions/cache@v4
         with:
           path: ~/deps
-          key: macOS deps ${{ hashFiles('.github/workflows/scripts/macos/build-dependencies.sh') }}
+          key: macos-26-xcode-26.4.1-qt14-universal-deps-${{ hashFiles('.github/workflows/scripts/macos/build-dependencies.sh') }}
 
       - name: Build Dependencies
         if: steps.cache-deps.outputs.cache-hit != 'true'
-        run: .github/workflows/scripts/macos/build-dependencies.sh
+        env:
+          DEPS_LOG_DIR: ${{ runner.temp }}/primehack-dependency-logs
+        run: bash .github/workflows/scripts/macos/build-dependencies.sh
 
       - name: Cache MoltenVK
         id: cache-moltenvk
         uses: actions/cache@v4
         with:
           path: ~/moltenvk
-          key: macOS MoltenVK ${{ hashFiles('Externals/MoltenVK') }}
+          key: macos-26-xcode-26.4.1-universal-moltenvk-v3-${{ hashFiles('.github/workflows/macos_build.yml', 'Externals/MoltenVK/CMakeLists.txt', 'Externals/MoltenVK/patches/*.patch') }}
 
       - name: Build MoltenVK
         if: steps.cache-moltenvk.outputs.cache-hit != 'true'
@@ -59,7 +74,7 @@ jobs:
           pushd mvk-build
           git apply ../Externals/MoltenVK/patches/*.patch
           ./fetchDependencies --macos
-          make macos
+          make macos ARCHS="x86_64 arm64" ONLY_ACTIVE_ARCH=NO MACOSX_DEPLOYMENT_TARGET="$MACOSX_DEPLOYMENT_TARGET"
           ls -l Package/Release/MoltenVK/dynamic/*
           chmod 755 Package/Release/MoltenVK/dynamic/dylib/macOS/libMoltenVK.dylib
           mkdir -p "$HOME/moltenvk/lib/"
@@ -67,95 +82,82 @@ jobs:
           popd
           rm -rf mvk-build
 
-      # -- SETUP CCACHE - https://cristianadam.eu/20200113/speeding-up-c-plus-plus-github-actions-using-ccache/
-      - name: Prepare ccache timestamp
-        id: ccache_cache_timestamp
-        run: echo "timestamp=$(date -u "+%Y-%m-%d-%H;%M;%S")" >> $GITHUB_OUTPUT
-
-      - name: Cache ccache cache
+      - name: Cache ccache
         uses: actions/cache@v4
         with:
           path: .ccache
-          key: macOS ccache ${{ steps.ccache_cache_timestamp.outputs.timestamp }}
-          restore-keys: macOS ccache
+          key: macos-26-xcode-26.4.1-universal-ccache-${{ github.run_id }}
+          restore-keys: macos-26-xcode-26.4.1-universal-ccache-
 
-      - name: Generate CMake Files
-        run: |
-          COMMON_ARGS=(
-            -DCMAKE_PREFIX_PATH="$HOME/deps;$HOME/moltenvk"
-            -DCMAKE_BUILD_TYPE=Release
-            -DUSE_BUNDLED_MOLTENVK=OFF
-            -DMACOS_CODE_SIGNING=OFF
-            -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
-            -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON
-            -DUSE_SYSTEM_LIBS=OFF
-            -DUSE_SYSTEM_BZIP2=ON
-            -DUSE_SYSTEM_CURL=ON
-            -DUSE_SYSTEM_ICONV=ON
-            -DUSE_SYSTEM_SDL2=ON
-            -GNinja
-          )
+      - name: Configure x86_64
+        run: bash .github/workflows/scripts/macos/configure.sh x86_64 build
 
-          cmake -DCMAKE_OSX_ARCHITECTURES=x86_64 \
-                -DCMAKE_SYSTEM_PROCESSOR=x86_64 \
-                -DCMAKE_SYSTEM_NAME=Darwin \
-                -DCMAKE_OSX_DEPLOYMENT_TARGET=10.15 \
-                "${COMMON_ARGS[@]}" \
-                -B build .
-          cmake -DCMAKE_OSX_ARCHITECTURES=arm64 \
-                -DCMAKE_SYSTEM_PROCESSOR=arm64 \
-                -DCMAKE_SYSTEM_NAME=Darwin \
-                -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
-                "${COMMON_ARGS[@]}" \
-                -B build-arm .
+      - name: Configure arm64
+        run: bash .github/workflows/scripts/macos/configure.sh arm64 build-arm
 
-      - name: Build Dolphin (x86_64)
-        working-directory: build
-        run: |
-          ccache -p
-          ccache -s
-          ccache -z
-          ninja dolphin-emu
-          ccache -s
+      - name: Build x86_64
+        run: bash .github/workflows/scripts/macos/build.sh build
 
-      - name: Build Dolphin (arm64)
-        working-directory: build-arm
-        run: |
-          ccache -p
-          ccache -s
-          ccache -z
-          ninja dolphin-emu
-          ccache -s
+      - name: Build arm64
+        run: bash .github/workflows/scripts/macos/build.sh build-arm
 
-      - name: Prepare Build Artifacts
-        id: create-artifact
+      - name: Run macOS unit tests
+        run: bash .github/workflows/scripts/macos/test.sh build
+
+      - name: Package and validate universal app
         env:
           EVENT_NAME: ${{ github.event_name }}
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_NUM: ${{ github.event.pull_request.number }}
           PR_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          lipo -create build/Binaries/DolphinQt.app/Contents/MacOS/DolphinQt build-arm/Binaries/DolphinQt.app/Contents/MacOS/DolphinQt -o dolphin
-          mv dolphin build/Binaries/DolphinQt.app/Contents/MacOS/DolphinQt
-          TAG="$(git tag --points-at HEAD)"
-          if [ ! -z "$TAG" ]; then
-            SUFFIX="$TAG"
-          elif [ "$EVENT_NAME" == "pull_request" ]; then
-            PR_TITLE=$(echo "${PR_TITLE}" | tr -cd '[a-zA-Z0-9[:space:]]_-')
-            SUFFIX="pr[$PR_NUM]-sha[$PR_SHA]-title[$PR_TITLE"
-            SUFFIX=$(printf "%.99s]" "$SUFFIX")
-          else
-            SUFFIX="sha[$(git rev-parse --short HEAD)]"
-          fi
-          APPNAME="PrimeHack-$SUFFIX"
-          mv build/Binaries/DolphinQt.app "$APPNAME.app"
-          tar --options xz:compression-level=9 -cvJf "$APPNAME.tar.xz" "$APPNAME.app"
-          echo "name=$APPNAME" >> "$GITHUB_OUTPUT"
+        run: bash .github/workflows/scripts/macos/package.sh build build-arm
 
-      - name: Upload Artifact
+      - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.create-artifact.outputs.name }}
+          name: macos-package-${{ github.sha }}
           path: "*.tar.xz"
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload build diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-build-diagnostics-${{ github.sha }}
+          path: |
+            build/build.log
+            build-arm/build.log
+            build/Testing/Temporary/LastTest.log
+            ${{ runner.temp }}/primehack-dependency-logs
+          if-no-files-found: ignore
+          retention-days: 14
+
+  release:
+    name: Publish macOS release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build_macos
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-package-${{ github.sha }}
+          path: release-assets
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          asset="$(find release-assets -type f -name '*.tar.xz' -print -quit)"
+          if [ -z "$asset" ]; then
+            echo "No macOS archive was found in the build artifact"
+            exit 1
+          fi
+          gh release create "$GITHUB_REF_NAME" "$asset" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes
