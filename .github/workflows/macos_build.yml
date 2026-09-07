@@ -11,7 +11,7 @@ permissions:
 jobs:
   build_macos:
     name: macOS Build
-    runs-on: macos-14
+    runs-on: macos-15
     permissions:
       contents: read
     env:
@@ -21,7 +21,7 @@ jobs:
       CCACHE_COMPRESSLEVEL: 9
       CCACHE_MAXSIZE: 200M
       MACOSX_DEPLOYMENT_TARGET: "11.0"
-      DEVELOPER_DIR: /Applications/Xcode_15.4.app/Contents/Developer
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
 
     steps:
       - name: Checkout Repository
@@ -46,7 +46,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/deps
-          key: macos-11-universal-deps-${{ hashFiles('.github/workflows/scripts/macos/build-dependencies.sh') }}
+          key: macos-11-xcode-16.4-universal-deps-${{ hashFiles('.github/workflows/scripts/macos/build-dependencies.sh') }}
 
       - name: Build Dependencies
         if: steps.cache-deps.outputs.cache-hit != 'true'
@@ -83,8 +83,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .ccache
-          key: macos-11-universal-ccache-v2-${{ github.run_id }}
-          restore-keys: macos-11-universal-ccache-v2-
+          key: macos-11-xcode-16.4-universal-ccache-${{ github.run_id }}
+          restore-keys: macos-11-xcode-16.4-universal-ccache-
 
       - name: Configure x86_64
         run: bash .github/workflows/scripts/macos/configure.sh x86_64 build
