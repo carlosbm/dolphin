@@ -22,7 +22,6 @@ jobs:
       CCACHE_MAXSIZE: 200M
       MACOSX_DEPLOYMENT_TARGET: "26.0"
       QT_DEPLOYMENT_TARGET: "14.0"
-      DEPS_LOG_DIR: ${{ runner.temp }}/primehack-dependency-logs
       DEVELOPER_DIR: /Applications/Xcode_26.4.1.app/Contents/Developer
 
     steps:
@@ -52,6 +51,8 @@ jobs:
 
       - name: Build Dependencies
         if: steps.cache-deps.outputs.cache-hit != 'true'
+        env:
+          DEPS_LOG_DIR: ${{ runner.temp }}/primehack-dependency-logs
         run: bash .github/workflows/scripts/macos/build-dependencies.sh
 
       - name: Cache MoltenVK
