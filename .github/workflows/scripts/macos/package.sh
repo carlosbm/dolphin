@@ -33,6 +33,18 @@ is_macho() {
   file -b "$1" | grep -q 'Mach-O'
 }
 
+extract_slice() {
+  local source_path="$1" arch="$2" destination_path="$3"
+  local archs
+  archs="$(lipo -archs "$source_path")"
+  if [[ "$archs" == "$arch" ]]; then
+    # lipo -thin rejects files that already contain only one architecture.
+    cp -p "$source_path" "$destination_path"
+  else
+    lipo -thin "$arch" "$source_path" -output "$destination_path"
+  fi
+}
+
 merge_macho_files() {
   local source_path relative_path arm_path destination_path
 
@@ -52,9 +64,10 @@ merge_macho_files() {
 
     # Dependencies may already be universal even though each application build
     # is single-architecture. Extract one slice from each input before merging.
-    lipo -thin x86_64 "$source_path" -output "$X86_SLICE"
-    lipo -thin arm64 "$arm_path" -output "$ARM_SLICE"
+    extract_slice "$source_path" x86_64 "$X86_SLICE"
+    extract_slice "$arm_path" arm64 "$ARM_SLICE"
     lipo -create "$X86_SLICE" "$ARM_SLICE" -output "$MERGE_FILE"
+    chmod "$(stat -f '%Lp' "$source_path")" "$MERGE_FILE"
     mv "$MERGE_FILE" "$destination_path"
   done < <(find "$X86_APP" -type f -print0)
 }
